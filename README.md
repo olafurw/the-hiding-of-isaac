@@ -16,10 +16,17 @@ The general feel should be.
 - Each room is really dangerous and could kill you if not handled correctly
 - Each room should be a puzzle where the player can look at it and think about the course of action
 
-Mod Status:
+Item concepts:
 
-- Enemies don't move
-- Rooms stay open
+- The Blanket
+    - Entering a room puts the blanket over isaac, turning him invisible
+    - He can shoot his main weapon in the cardinal directions but it has a long cooldown
+    - He can move which will start a cooldown on the blanket so it cant be used immediately
+
+- Sheep Jaw
+    - Knife like item
+    - Has a very long throw cooldown
+    - If Isaac is hidden the hit will oneshot any enemy
 
 Todo:
 
