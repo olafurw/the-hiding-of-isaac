@@ -1,16 +1,48 @@
 require('mobdebug').start()
 
-local hiding = RegisterMod("Hiding", 1)
+function SetupMod(modname, apiversion)
+  local mod = {
+    Name = modname,
+    AddCallback = function(self, callbackId, fn, entityId)
+      if entityId == nil then entityId = -1; end
+      
+      Isaac.AddCallback(self, callbackId, fn, entityId)
+    end,
+    SaveData = function(self, data)
+      Isaac.SaveModData(self, data)
+    end,
+    LoadData = function(self)
+      return Isaac.LoadModData(self)
+    end,
+    HasData = function(self)
+      return Isaac.HasModData(self)
+    end,
+    RemoveData = function(self)
+      Isaac.RemoveModData(self)
+    end
+  }
+  Isaac.RegisterMod(mod, modname, apiversion)
+  return mod
+end
 
-roomIndex = 0
-hasIsaacBeenSeen = false
-closestEnemy = 0.0
+local hiding = SetupMod("Hiding", 1)
 
-function IsNewRoom(aLevel)
-  local oldRoomIndex = roomIndex
-  roomIndex = aLevel:GetCurrentRoomIndex()
+local CurrentRoom = {
+  myRoomIndex = 0,
+  myClosestEnemyDistance = 0.0,
+  myHasIsaacBeenSeen = false
+}
+
+function CurrentRoom:Reset()
+  myClosestEnemyDistance = 0.0
+  myHasIsaacBeenSeen = false
+end
+
+function CurrentRoom:IsNewRoom(aLevel)
+  local oldRoomIndex = myRoomIndex
+  myRoomIndex = aLevel:GetCurrentRoomIndex()
   
-  return oldRoomIndex ~= roomIndex
+  return oldRoomIndex ~= myRoomIndex
 end
 
 function DoExpensiveAction(aPlayer)
@@ -58,12 +90,14 @@ function FreezeAllEnemies()
 end
 
 function hiding:PlayerInit(aConstPlayer)
+  local game = Game()
+  local level = game:GetLevel()
   local player = Isaac.GetPlayer(0)
 end
 
 function hiding:Text()
-  local seenText = "Seen: " .. tostring(hasIsaacBeenSeen)
-  local closestEnemy = "Distance: " .. tostring(math.floor(closestEnemy))
+  local seenText = "Seen: " .. tostring(CurrentRoom.myHasIsaacBeenSeen)
+  local closestEnemy = "Distance: " .. tostring(math.floor(CurrentRoom.myClosestEnemyDistance))
   
 	Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
   Isaac.RenderText(closestEnemy, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
@@ -83,13 +117,12 @@ function hiding:PostPerfectUpdate(aConstPlayer)
   local room = game:GetRoom()
   local level = game:GetLevel()
   
-  local enemies = {}
-  
-  if IsNewRoom(level) then
-    hasIsaacBeenSeen = false
+  if CurrentRoom:IsNewRoom(level) then
+    CurrentRoom:Reset()
     OpenNormalDoors(room)
-    --FreezeAllEnemies()
   end
+  
+  level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
   
   if not DoExpensiveAction(player) then
     return
@@ -107,19 +140,19 @@ function hiding:PostPerfectUpdate(aConstPlayer)
         closestDistance = distance
       end
       
-      closestEnemy = closestDistance
+      CurrentRoom.myClosestEnemyDistance = closestDistance
     end
     
-    if not hasIsaacBeenSeen and entities[i]:IsActiveEnemy() then
+    if not CurrentRoom.myHasIsaacBeenSeen and entities[i]:IsActiveEnemy() then
       entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
     end
     
-    if not hasIsaacBeenSeen and closestDistance ~= nil and closestDistance < 80 then
+    if not CurrentRoom.myHasIsaacBeenSeen and closestDistance ~= nil and closestDistance < 80 then
       hasIsaacBeenSeen = true
       CloseNormalDoors(room)
     end
     
-    if hasIsaacBeenSeen and distance < 80 then
+    if CurrentRoom.myHasIsaacBeenSeen and distance < 80 then
       entities[i]:ClearEntityFlags(EntityFlag.FLAG_FREEZE)
     end
     
