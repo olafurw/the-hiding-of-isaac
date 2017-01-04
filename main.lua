@@ -45,6 +45,21 @@ function CurrentRoom:IsNewRoom(aLevel)
   return oldRoomIndex ~= myRoomIndex
 end
 
+local CurrentFloor = {
+  myStageIndex = LevelStage.STAGE_NULL
+}
+
+function CurrentFloor:Reset()
+  myStageIndex = LevelStage.STAGE_NULL
+end
+
+function CurrentFloor:IsNewFloor(aLevel)
+  local oldStageIndex = myStageIndex
+  myStageIndex = aLevel:GetAbsoluteStage()
+  
+  return oldStageIndex ~= myStageIndex
+end
+
 function DoExpensiveAction(aPlayer)
   return aPlayer.FrameCount % 10 == 0
 end
@@ -93,6 +108,9 @@ function hiding:PlayerInit(aConstPlayer)
   local game = Game()
   local level = game:GetLevel()
   local player = Isaac.GetPlayer(0)
+  
+  CurrentFloor:Reset()
+  CurrentRoom:Reset()
 end
 
 function hiding:Text()
@@ -122,7 +140,9 @@ function hiding:PostPerfectUpdate(aConstPlayer)
     OpenNormalDoors(room)
   end
   
-  level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
+  if CurrentFloor:IsNewFloor(level) then
+    level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
+  end
   
   if not DoExpensiveAction(player) then
     return
