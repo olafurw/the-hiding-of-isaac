@@ -2,10 +2,9 @@ require('mobdebug').start()
 
 local hiding = RegisterMod("Hiding", 1)
 
-debugText = 0.0
-
 roomIndex = 0
 hasIsaacBeenSeen = false
+closestEnemy = 0.0
 
 function IsNewRoom(aLevel)
   local oldRoomIndex = roomIndex
@@ -51,7 +50,11 @@ function hiding:PlayerInit(aConstPlayer)
 end
 
 function hiding:Text()
-	--Isaac.RenderText(tostring(debugText), 100.0, 100.0, 1.0, 1.0, 1.0, 1.0)
+  local seenText = "Seen: " .. tostring(hasIsaacBeenSeen)
+  local closestEnemy = "Distance: " .. tostring(math.floor(closestEnemy))
+  
+	Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
+  Isaac.RenderText(closestEnemy, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
 end
 
 function hiding:TakeDamage()
@@ -94,21 +97,28 @@ function hiding:PostPerfectUpdate(aConstPlayer)
   
   for i = 1, #entities do
     
+    local distance = DistanceFromPlayer(player, entities[i])
+    
     if entities[i]:IsActiveEnemy() then
-      entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
-      
-      local distance = DistanceFromPlayer(player, entities[i])
-      
       if closestDistance == nil or closestDistance > distance then
         closestDistance = distance
       end
       
+      closestEnemy = closestDistance
     end
     
-    --if entities[i]:HiddenIsFrozen and not entities[i]:HasFullHealth() then
-    --  entities[i]:ClearEntityFlags(EntityFlag.FLAG_FREEZE)
-    --  CloseNormalDoors(room)
-    --end
+    if not hasIsaacBeenSeen and entities[i]:IsActiveEnemy() then
+      entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
+    end
+    
+    if not hasIsaacBeenSeen and closestDistance ~= nil and closestDistance < 80 then
+      hasIsaacBeenSeen = true
+      CloseNormalDoors(room)
+    end
+    
+    if hasIsaacBeenSeen and distance < 80 then
+      entities[i]:ClearEntityFlags(EntityFlag.FLAG_FREEZE)
+    end
     
   end
   
