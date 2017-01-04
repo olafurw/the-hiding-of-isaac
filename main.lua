@@ -1,4 +1,4 @@
-require('mobdebug').start()
+--require('mobdebug').start()
 
 function SetupMod(modname, apiversion)
   local mod = {
@@ -27,6 +27,8 @@ end
 
 local hiding = SetupMod("Hiding", 1)
 
+local rng = RNG()
+
 local CurrentRoom = {
   myRoomIndex = 0,
   myClosestEnemyDistance = 0.0,
@@ -34,15 +36,15 @@ local CurrentRoom = {
 }
 
 function CurrentRoom:Reset()
-  myClosestEnemyDistance = 0.0
-  myHasIsaacBeenSeen = false
+  CurrentRoom.myClosestEnemyDistance = 0.0
+  CurrentRoom.myHasIsaacBeenSeen = false
 end
 
 function CurrentRoom:IsNewRoom(aLevel)
-  local oldRoomIndex = myRoomIndex
-  myRoomIndex = aLevel:GetCurrentRoomIndex()
+  local oldRoomIndex = CurrentRoom.myRoomIndex
+  CurrentRoom.myRoomIndex = aLevel:GetCurrentRoomIndex()
   
-  return oldRoomIndex ~= myRoomIndex
+  return oldRoomIndex ~= CurrentRoom.myRoomIndex
 end
 
 local CurrentFloor = {
@@ -50,14 +52,14 @@ local CurrentFloor = {
 }
 
 function CurrentFloor:Reset()
-  myStageIndex = LevelStage.STAGE_NULL
+  CurrentRoom.myStageIndex = LevelStage.STAGE_NULL
 end
 
 function CurrentFloor:IsNewFloor(aLevel)
-  local oldStageIndex = myStageIndex
-  myStageIndex = aLevel:GetAbsoluteStage()
+  local oldStageIndex = CurrentRoom.myStageIndex
+  CurrentRoom.myStageIndex = aLevel:GetAbsoluteStage()
   
-  return oldStageIndex ~= myStageIndex
+  return oldStageIndex ~= CurrentRoom.myStageIndex
 end
 
 function DoExpensiveAction(aPlayer)
@@ -88,6 +90,16 @@ function CloseNormalDoors(aRoom)
   end
 end
 
+function MorphEnemiesToChampions()
+  local	entities = Isaac.GetRoomEntities()
+  
+  for i = 1, #entities do
+    if entities[i]:IsActiveEnemy() then
+      entities[i]:MakeChampion(1)
+    end
+  end
+end
+
 function DistanceFromPlayer(aPlayer, aEntity)
   return aPlayer.Position:Distance(aEntity.Position)
 end
@@ -108,17 +120,22 @@ function hiding:PlayerInit(aConstPlayer)
   local game = Game()
   local level = game:GetLevel()
   local player = Isaac.GetPlayer(0)
+  player:AddCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE, 0, false)
+  player:AddCollectible(CollectibleType.COLLECTIBLE_CEREMONIAL_ROBES, 0, false)
+  player:AddMaxHearts(-7, true)
+  player:AddBlackHearts(-4)
+  player:RemoveBlackHeart(2)
   
   CurrentFloor:Reset()
   CurrentRoom:Reset()
 end
 
 function hiding:Text()
-  local seenText = "Seen: " .. tostring(CurrentRoom.myHasIsaacBeenSeen)
-  local closestEnemy = "Distance: " .. tostring(math.floor(CurrentRoom.myClosestEnemyDistance))
+  --local seenText = "Seen: " .. tostring(CurrentRoom.myHasIsaacBeenSeen)
+  --local closestEnemy = "Distance: " .. tostring(math.floor(CurrentRoom.myClosestEnemyDistance))
   
-	Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
-  Isaac.RenderText(closestEnemy, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
+  --Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
+  --Isaac.RenderText(closestEnemy, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
 end
 
 function hiding:TakeDamage()
@@ -135,13 +152,14 @@ function hiding:PostPerfectUpdate(aConstPlayer)
   local room = game:GetRoom()
   local level = game:GetLevel()
   
-  if CurrentRoom:IsNewRoom(level) then
-    CurrentRoom:Reset()
-    OpenNormalDoors(room)
-  end
-  
   if CurrentFloor:IsNewFloor(level) then
     level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
+  end
+  
+  if CurrentRoom:IsNewRoom(level) then
+    CurrentRoom:Reset()
+    level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
+    OpenNormalDoors(room)
   end
   
   if not DoExpensiveAction(player) then
@@ -163,16 +181,16 @@ function hiding:PostPerfectUpdate(aConstPlayer)
       CurrentRoom.myClosestEnemyDistance = closestDistance
     end
     
-    if not CurrentRoom.myHasIsaacBeenSeen and entities[i]:IsActiveEnemy() then
+    if not CurrentRoom.myHasIsaacBeenSeen and entities[i]:IsActiveEnemy() and not entities[i]:IsBoss() then
       entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
     end
     
-    if not CurrentRoom.myHasIsaacBeenSeen and closestDistance ~= nil and closestDistance < 80 then
-      hasIsaacBeenSeen = true
+    if not CurrentRoom.myHasIsaacBeenSeen and closestDistance ~= nil and closestDistance < 110 then
+      CurrentRoom.myHasIsaacBeenSeen = true
       CloseNormalDoors(room)
     end
     
-    if CurrentRoom.myHasIsaacBeenSeen and distance < 80 then
+    if CurrentRoom.myHasIsaacBeenSeen and distance < 110 then
       entities[i]:ClearEntityFlags(EntityFlag.FLAG_FREEZE)
     end
     

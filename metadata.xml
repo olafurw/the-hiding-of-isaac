@@ -1,8 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <metadata>
-	<name>Hiding</name>
-	<directory>hiding</directory>
-	<description/>
-	<version>1.0</version>
-	<visibility/>
-</metadata>
+    <name>The Hiding of Isaac</name>
+    <directory>the-hiding-of-isaac</directory>
+    <id>834433846</id>
+    <description>The Hiding of Isaac is a stealth focused mod for AB+. It's is very early development so do not expect a full fledged experience now.
 
+The general idea is to make a game mode where you sneak around the levels, bypass enemies, pick locks, backstab and stealth around enemies.
+
+Follow the mod on GitHub: https://github.com/olafurw/the-hiding-of-isaac</description>
+    <version>0.3</version>
+    <visibility>Public</visibility>
+    <tag id="Items"/>
+    <tag id="Player Characters"/>
+    <tag id="Challenges"/>
+</metadata>
