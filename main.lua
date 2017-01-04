@@ -45,6 +45,18 @@ function DistanceFromPlayer(aPlayer, aEntity)
   return aPlayer.Position:Distance(aEntity.Position)
 end
 
+function FreezeAllEnemies()
+  local	entities = Isaac.GetRoomEntities()
+    
+  for i = 1, #entities do
+    
+    if entities[i]:IsActiveEnemy() then
+      entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
+    end
+    
+  end
+end
+
 function hiding:PlayerInit(aConstPlayer)
   local player = Isaac.GetPlayer(0)
 end
@@ -76,16 +88,7 @@ function hiding:PostPerfectUpdate(aConstPlayer)
   if IsNewRoom(level) then
     hasIsaacBeenSeen = false
     OpenNormalDoors(room)
-    
-    local	entities = Isaac.GetRoomEntities()
-    
-    for i = 1, #entities do
-      
-      if entities[i]:IsActiveEnemy() then
-        entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
-      end
-      
-    end
+    --FreezeAllEnemies()
   end
   
   if not DoExpensiveAction(player) then
