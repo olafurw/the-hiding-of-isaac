@@ -25,18 +25,20 @@ function SetupMod(modname, apiversion)
   return mod
 end
 
-local hiding = SetupMod("Hiding", 1)
+local hiding = SetupMod("the-hiding-of-isaac", 1)
 
 local rng = RNG()
+local roomsClearedHidden = 0
 
 local CurrentRoom = {
   myRoomIndex = 0,
-  myClosestEnemyDistance = 0.0,
+  myRoomInitialEnemyCount = 0,
+  myClosestEnemyDistance = 9000.0,
   myHasIsaacBeenSeen = false
 }
 
 function CurrentRoom:Reset()
-  CurrentRoom.myClosestEnemyDistance = 0.0
+  CurrentRoom.myClosestEnemyDistance = 9000.0
   CurrentRoom.myHasIsaacBeenSeen = false
 end
 
@@ -120,6 +122,10 @@ function hiding:PlayerInit(aConstPlayer)
   local game = Game()
   local level = game:GetLevel()
   local player = Isaac.GetPlayer(0)
+  local room = game:GetRoom()
+  
+  roomsClearedHidden = 0
+  
   player:AddCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE, 0, false)
   player:AddCollectible(CollectibleType.COLLECTIBLE_CEREMONIAL_ROBES, 0, false)
   player:AddMaxHearts(-7, true)
@@ -128,17 +134,21 @@ function hiding:PlayerInit(aConstPlayer)
   
   CurrentFloor:Reset()
   CurrentRoom:Reset()
+  CurrentRoom.myRoomInitialEnemyCount = room:GetAliveEnemiesCount()
 end
 
 function hiding:Text()
-  --local seenText = "Seen: " .. tostring(CurrentRoom.myHasIsaacBeenSeen)
+  local roomsClearedHiddenText = "Stealth: " .. tostring(roomsClearedHidden)
+  local seenText = "Hidden: " .. tostring(not CurrentRoom.myHasIsaacBeenSeen)
   --local closestEnemy = "Distance: " .. tostring(math.floor(CurrentRoom.myClosestEnemyDistance))
   
-  --Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
+  Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
   --Isaac.RenderText(closestEnemy, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
+  Isaac.RenderText(roomsClearedHiddenText, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
 end
 
-function hiding:TakeDamage()
+function hiding:TakeDamage(aEntity)
+  
 end
 
 function hiding:PostUpdate()
@@ -158,44 +168,64 @@ function hiding:PostPerfectUpdate(aConstPlayer)
   
   if CurrentRoom:IsNewRoom(level) then
     CurrentRoom:Reset()
+    CurrentRoom.myRoomInitialEnemyCount = room:GetAliveEnemiesCount()
+    
     level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
     OpenNormalDoors(room)
+  end
+  
+  if not CurrentRoom.myHasIsaacBeenSeen and CurrentRoom.myRoomInitialEnemyCount ~= 0 and room:GetAliveEnemiesCount() == 0 then
+    roomsClearedHidden = roomsClearedHidden + 1
+    CurrentRoom.myRoomInitialEnemyCount = 0
   end
   
   if not DoExpensiveAction(player) then
     return
   end
   
-  local closestDistance = nil
   local	entities = Isaac.GetRoomEntities()
-  
+  local oldHasIsaacBeenSeen = CurrentRoom.myHasIsaacBeenSeen
+    
   for i = 1, #entities do
-    
-    local distance = DistanceFromPlayer(player, entities[i])
-    
+
     if entities[i]:IsActiveEnemy() then
-      if closestDistance == nil or closestDistance > distance then
-        closestDistance = distance
+
+      local distance = DistanceFromPlayer(player, entities[i])
+      
+      if distance < CurrentRoom.myClosestEnemyDistance then
+        CurrentRoom.myClosestEnemyDistance = distance
       end
       
-      CurrentRoom.myClosestEnemyDistance = closestDistance
+      if CurrentRoom.myClosestEnemyDistance < 110 then
+        CurrentRoom.myHasIsaacBeenSeen = true
+      end
+
+      if not CurrentRoom.myHasIsaacBeenSeen and not entities[i]:IsBoss() then
+        entities[i]:AddEntityFlags(EntityFlag.FLAG_CONFUSION)
+        entities[i]:AddEntityFlags(EntityFlag.FLAG_SLOW)
+      else
+        entities[i]:ClearEntityFlags(EntityFlag.FLAG_CONFUSION)
+        entities[i]:ClearEntityFlags(EntityFlag.FLAG_SLOW)
+      end
+      
     end
-    
-    if not CurrentRoom.myHasIsaacBeenSeen and entities[i]:IsActiveEnemy() and not entities[i]:IsBoss() then
-      entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
-    end
-    
-    if not CurrentRoom.myHasIsaacBeenSeen and closestDistance ~= nil and closestDistance < 110 then
-      CurrentRoom.myHasIsaacBeenSeen = true
-      CloseNormalDoors(room)
-    end
-    
-    if CurrentRoom.myHasIsaacBeenSeen and distance < 110 then
-      entities[i]:ClearEntityFlags(EntityFlag.FLAG_FREEZE)
-    end
-    
   end
   
+  if oldHasIsaacBeenSeen ~= CurrentRoom.myHasIsaacBeenSeen then
+    CloseNormalDoors(room)
+  end
+  
+end
+
+function hiding:NpcUpdate(aNpc)
+  local game = Game()
+  local room = game:GetRoom()
+  
+  aNpc:MakeChampion(rng:Next())
+  
+  if aNpc:IsBoss() then
+    CloseNormalDoors(room)
+  end
 end
 
 function hiding:PostRender()
@@ -203,7 +233,8 @@ end
 
 hiding:AddCallback(ModCallbacks.MC_POST_PLAYER_INIT, hiding.PlayerInit)
 hiding:AddCallback(ModCallbacks.MC_POST_RENDER, hiding.Text)
-hiding:AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, hiding.TakeDamage, EntityType.ENTITY_PLAYER)
+hiding:AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, hiding.TakeDamage)
 hiding:AddCallback(ModCallbacks.MC_POST_UPDATE, hiding.PostUpdate)
 hiding:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, hiding.PostPerfectUpdate)
 hiding:AddCallback(ModCallbacks.MC_POST_RENDER, hiding.PostRender)
+hiding:AddCallback(ModCallbacks.MC_NPC_UPDATE, hiding.NpcUpdate)
