@@ -8,7 +8,7 @@
 The general idea is to make a game mode where you sneak around the levels, bypass enemies, pick locks, backstab and stealth around enemies.
 
 Follow the mod on GitHub: https://github.com/olafurw/the-hiding-of-isaac</description>
-    <version>0.4</version>
+    <version>0.6</version>
     <visibility>Public</visibility>
     <tag id="Items"/>
     <tag id="Player Characters"/>

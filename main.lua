@@ -1,19 +1,44 @@
 --require('mobdebug').start()
 
--- <3 /u/brucemanson on reddit
-function IncludeFile(aFilename)
-  local sourcePath = debug.getinfo(1, "S").source:sub(2)
-  local baseDir = sourcePath:match(".*/") or "./"
-  
-  dofile( ("%s%s"):format(baseDir, aFilename) )
-end
-
-IncludeFile("utils.lua")
-IncludeFile("currentRoom.lua")
-
 --local debugFile = io.open("hiding-debug.txt", "w")
 
-local hiding = SetupMod("the-hiding-of-isaac", 1)
+local hiding = RegisterMod("the-hiding-of-isaac", 1)
+
+-- Current Room
+CurrentRoom = {
+  myRoomIndex = 0,
+  myRoomInitialEnemyCount = 0,
+  myClosestEnemyDistance = 9000.0,
+  myHasIsaacBeenSeen = false
+}
+
+function CurrentRoom:Reset()
+  CurrentRoom.myClosestEnemyDistance = 9000.0
+  CurrentRoom.myHasIsaacBeenSeen = false
+end
+
+function CurrentRoom:IsNewRoom(aLevel)
+  local oldRoomIndex = CurrentRoom.myRoomIndex
+  CurrentRoom.myRoomIndex = aLevel:GetCurrentRoomIndex()
+  
+  return oldRoomIndex ~= CurrentRoom.myRoomIndex
+end
+
+-- Current Floor
+CurrentFloor = {
+  myStageIndex = LevelStage.STAGE_NULL
+}
+
+function CurrentFloor:Reset()
+  CurrentRoom.myStageIndex = LevelStage.STAGE_NULL
+end
+
+function CurrentFloor:IsNewFloor(aLevel)
+  local oldStageIndex = CurrentRoom.myStageIndex
+  CurrentRoom.myStageIndex = aLevel:GetAbsoluteStage()
+  
+  return oldStageIndex ~= CurrentRoom.myStageIndex
+end
 
 local rng = RNG()
 local roomsClearedHidden = 0
