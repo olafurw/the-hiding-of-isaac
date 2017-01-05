@@ -1,68 +1,22 @@
 --require('mobdebug').start()
 
-function SetupMod(modname, apiversion)
-  local mod = {
-    Name = modname,
-    AddCallback = function(self, callbackId, fn, entityId)
-      if entityId == nil then entityId = -1; end
-      
-      Isaac.AddCallback(self, callbackId, fn, entityId)
-    end,
-    SaveData = function(self, data)
-      Isaac.SaveModData(self, data)
-    end,
-    LoadData = function(self)
-      return Isaac.LoadModData(self)
-    end,
-    HasData = function(self)
-      return Isaac.HasModData(self)
-    end,
-    RemoveData = function(self)
-      Isaac.RemoveModData(self)
-    end
-  }
-  Isaac.RegisterMod(mod, modname, apiversion)
-  return mod
+-- <3 /u/brucemanson on reddit
+function IncludeFile(aFilename)
+  local sourcePath = debug.getinfo(1, "S").source:sub(2)
+  local baseDir = sourcePath:match(".*/") or "./"
+  
+  dofile( ("%s%s"):format(baseDir, aFilename) )
 end
+
+IncludeFile("utils.lua")
+IncludeFile("currentRoom.lua")
+
+--local debugFile = io.open("hiding-debug.txt", "w")
 
 local hiding = SetupMod("the-hiding-of-isaac", 1)
 
 local rng = RNG()
 local roomsClearedHidden = 0
-
-local CurrentRoom = {
-  myRoomIndex = 0,
-  myRoomInitialEnemyCount = 0,
-  myClosestEnemyDistance = 9000.0,
-  myHasIsaacBeenSeen = false
-}
-
-function CurrentRoom:Reset()
-  CurrentRoom.myClosestEnemyDistance = 9000.0
-  CurrentRoom.myHasIsaacBeenSeen = false
-end
-
-function CurrentRoom:IsNewRoom(aLevel)
-  local oldRoomIndex = CurrentRoom.myRoomIndex
-  CurrentRoom.myRoomIndex = aLevel:GetCurrentRoomIndex()
-  
-  return oldRoomIndex ~= CurrentRoom.myRoomIndex
-end
-
-local CurrentFloor = {
-  myStageIndex = LevelStage.STAGE_NULL
-}
-
-function CurrentFloor:Reset()
-  CurrentRoom.myStageIndex = LevelStage.STAGE_NULL
-end
-
-function CurrentFloor:IsNewFloor(aLevel)
-  local oldStageIndex = CurrentRoom.myStageIndex
-  CurrentRoom.myStageIndex = aLevel:GetAbsoluteStage()
-  
-  return oldStageIndex ~= CurrentRoom.myStageIndex
-end
 
 function DoExpensiveAction(aPlayer)
   return aPlayer.FrameCount % 10 == 0
@@ -92,30 +46,8 @@ function CloseNormalDoors(aRoom)
   end
 end
 
-function MorphEnemiesToChampions()
-  local	entities = Isaac.GetRoomEntities()
-  
-  for i = 1, #entities do
-    if entities[i]:IsActiveEnemy() then
-      entities[i]:MakeChampion(1)
-    end
-  end
-end
-
 function DistanceFromPlayer(aPlayer, aEntity)
   return aPlayer.Position:Distance(aEntity.Position)
-end
-
-function FreezeAllEnemies()
-  local	entities = Isaac.GetRoomEntities()
-    
-  for i = 1, #entities do
-    
-    if entities[i]:IsActiveEnemy() then
-      entities[i]:AddEntityFlags(EntityFlag.FLAG_FREEZE)
-    end
-    
-  end
 end
 
 function hiding:PlayerInit(aConstPlayer)
@@ -139,12 +71,8 @@ end
 
 function hiding:Text()
   local roomsClearedHiddenText = "Stealth: " .. tostring(roomsClearedHidden)
-  local seenText = "Hidden: " .. tostring(not CurrentRoom.myHasIsaacBeenSeen)
-  --local closestEnemy = "Distance: " .. tostring(math.floor(CurrentRoom.myClosestEnemyDistance))
   
-  Isaac.RenderText(seenText, 10.0, 100.0, 1.0, 1.0, 1.0, 1.0)
-  --Isaac.RenderText(closestEnemy, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
-  Isaac.RenderText(roomsClearedHiddenText, 10.0, 112.0, 1.0, 1.0, 1.0, 1.0)
+  Isaac.RenderText(roomsClearedHiddenText, 5.0, 225.0, 1.0, 1.0, 1.0, 1.0)
 end
 
 function hiding:TakeDamage(aEntity)
@@ -152,11 +80,6 @@ function hiding:TakeDamage(aEntity)
 end
 
 function hiding:PostUpdate()
-
-end
-
-function hiding:PostPerfectUpdate(aConstPlayer)
-  
   local player = Isaac.GetPlayer(0)
   local game = Game()
   local room = game:GetRoom()
@@ -172,6 +95,7 @@ function hiding:PostPerfectUpdate(aConstPlayer)
     
     level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
     OpenNormalDoors(room)
+    
   end
   
   if not CurrentRoom.myHasIsaacBeenSeen and CurrentRoom.myRoomInitialEnemyCount ~= 0 and room:GetAliveEnemiesCount() == 0 then
@@ -198,6 +122,7 @@ function hiding:PostPerfectUpdate(aConstPlayer)
       
       if CurrentRoom.myClosestEnemyDistance < 110 then
         CurrentRoom.myHasIsaacBeenSeen = true
+        level:RemoveCurse(LevelCurse.CURSE_OF_DARKNESS)
       end
 
       if not CurrentRoom.myHasIsaacBeenSeen and not entities[i]:IsBoss() then
@@ -214,27 +139,38 @@ function hiding:PostPerfectUpdate(aConstPlayer)
   if oldHasIsaacBeenSeen ~= CurrentRoom.myHasIsaacBeenSeen then
     CloseNormalDoors(room)
   end
+end
+
+function hiding:PostPEffectUpdate(aConstPlayer)
   
 end
 
 function hiding:NpcUpdate(aNpc)
   local game = Game()
   local room = game:GetRoom()
+  local level = game:GetLevel()
   
-  aNpc:MakeChampion(rng:Next())
+  if not aNpc:IsChampion() then
+    aNpc:MakeChampion(rng:Next())
+  end
   
   if aNpc:IsBoss() then
     CloseNormalDoors(room)
+    level:RemoveCurse(LevelCurse.CURSE_OF_DARKNESS)
   end
 end
 
 function hiding:PostRender()
 end
 
+function hiding:EvaluateCache(aNumber)
+end
+
 hiding:AddCallback(ModCallbacks.MC_POST_PLAYER_INIT, hiding.PlayerInit)
 hiding:AddCallback(ModCallbacks.MC_POST_RENDER, hiding.Text)
 hiding:AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, hiding.TakeDamage)
 hiding:AddCallback(ModCallbacks.MC_POST_UPDATE, hiding.PostUpdate)
-hiding:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, hiding.PostPerfectUpdate)
+hiding:AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, hiding.PostPEffectUpdate)
 hiding:AddCallback(ModCallbacks.MC_POST_RENDER, hiding.PostRender)
 hiding:AddCallback(ModCallbacks.MC_NPC_UPDATE, hiding.NpcUpdate)
+hiding:AddCallback(ModCallbacks.MC_EVALUATE_CACHE, hiding.EvaluateCache)
