@@ -1,0 +1,3 @@
+<items gfxroot="gfx/items/" version="1">
+	<active description="Your best friend at times of danger" gfx="collectibles_6789_headinbag.png" maxcharges="1" name="Head in a bag" />
+</items>
