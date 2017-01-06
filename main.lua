@@ -259,6 +259,7 @@ function hiding:PostRender()
   local player = Isaac.GetPlayer(0)
   
   if robesCostume ~= nil and not CurrentRoom.myIsBossRoom and not CurrentRoom.myHasIsaacBeenSeen and not CurrentRoom.myIsHeadInABagActive then
+    player:RemoveCostume(robesCostume)
     player:AddCostume(robesCostume, false)
   end
   
