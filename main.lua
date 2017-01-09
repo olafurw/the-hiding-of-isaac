@@ -1,9 +1,17 @@
---require('mobdebug').start()
-
---local debugFile = io.open("hiding-debug.txt", "w")
+--StartDebug()
 
 local hiding = RegisterMod("the-hiding-of-isaac", 1)
 local headInABag = Isaac.GetItemIdByName("Head in a bag")
+
+knifeDamageReduction = 0.25
+
+Character = {
+  myStealthDamageBonus = 0.0
+}
+
+function Character:Reset()
+  Character.myStealthDamageBonus = 0.0
+end
 
 -- Current Room
 CurrentRoom = {
@@ -118,14 +126,17 @@ function hiding:PlayerInit(aConstPlayer)
   local player = Isaac.GetPlayer(0)
   local room = game:GetRoom()
   
+  Character:Reset()
+  
   roomsClearedHidden = 0
   hasSpawnedBag = false
   
-  player:AddCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE, 0, false)
+  player:AddCacheFlags(CacheFlag.CACHE_DAMAGE)
   player:AddCollectible(headInABag, 1, false)
   player:AddMaxHearts(-7, true)
   player:AddBlackHearts(2)
   
+  Character:Reset()
   CurrentFloor:Reset()
   CurrentRoom:Reset()
   CurrentRoom.myRoomInitialEnemyCount = room:GetAliveEnemiesCount()
@@ -139,7 +150,7 @@ end
 function hiding:Text()
   local roomsClearedHiddenText = "Stealth: " .. tostring(roomsClearedHidden)
   
-  Isaac.RenderText(roomsClearedHiddenText, 35.0, 35.0, 1.0, 1.0, 1.0, 1.0)
+  Isaac.RenderText(roomsClearedHiddenText, 5.0, 215.0, 1.0, 1.0, 1.0, 1.0)
 end
 
 function hiding:TakeDamage(aEntity)
@@ -147,6 +158,10 @@ function hiding:TakeDamage(aEntity)
 end
 
 function hiding:PostUpdate()
+  
+end
+
+function hiding:PostPEffectUpdate(aConstPlayer)
   local player = Isaac.GetPlayer(0)
   local game = Game()
   local room = game:GetRoom()
@@ -167,26 +182,26 @@ function hiding:PostUpdate()
       CurrentRoom.myIsBossRoom = true
     end
     
-    if not player:HasCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE) then
-      player:AddCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE, 0, false)
-    end
   end
   
   if not hasSpawnedBag then
     hasSpawnedBag = true
     local pos = Isaac.GetFreeNearPosition(player.Position, 80)
     Isaac.Spawn(EntityType.ENTITY_PICKUP, PickupVariant.PICKUP_COLLECTIBLE, headInABag, pos, Vector(0, 0), player)
+    
+    local pos2 = Isaac.GetFreeNearPosition(player.Position, 80)
+    Isaac.Spawn(EntityType.ENTITY_PICKUP, PickupVariant.PICKUP_COLLECTIBLE, CollectibleType.COLLECTIBLE_MOMS_KNIFE, pos2, Vector(0, 0), player)
   end
   
   if not CurrentRoom.myHasIsaacBeenSeen and CurrentRoom.myRoomInitialEnemyCount ~= 0 and room:GetAliveEnemiesCount() == 0 then
     roomsClearedHidden = roomsClearedHidden + 1
     CurrentRoom.myRoomInitialEnemyCount = 0
+    
+    Character.myStealthDamageBonus = Character.myStealthDamageBonus + 0.05
+    player:AddCacheFlags(CacheFlag.CACHE_DAMAGE)
+    player:EvaluateItems()
   end
-  
-  if CurrentRoom.myIsHeadInABagActive and player:GetFireDirection() ~= -1 then
-    CurrentRoom.myIsHeadInABagActive = false
-  end
-  
+    
   if not DoExpensiveAction(player) then
     return
   end
@@ -229,26 +244,14 @@ function hiding:PostUpdate()
   
   if oldHasIsaacBeenSeen ~= CurrentRoom.myHasIsaacBeenSeen then
     CloseNormalDoors(room)
-    
-    if not isBossInRoom then
-      player:RemoveCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE)
-    end
   end
-end
-
-function hiding:PostPEffectUpdate(aConstPlayer)
-
 end
 
 function hiding:NpcUpdate(aNpc)
   local game = Game()
   local room = game:GetRoom()
   local level = game:GetLevel()
-  
-  if not aNpc:IsChampion() and not aNpc:IsBoss() then
-    aNpc:MakeChampion(rng:Next())
-  end
-  
+
   if aNpc:IsBoss() then
     CloseNormalDoors(room)
     level:RemoveCurse(LevelCurse.CURSE_OF_DARKNESS)
@@ -275,11 +278,21 @@ function hiding:PostRender()
   end
 end
 
-function hiding:EvaluateCache(aNumber)
+function hiding:EvaluateCache(aEntityPlayer, aCacheFlag)
+  if aCacheFlag == CacheFlag.CACHE_DAMAGE and aEntityPlayer:HasCollectible(CollectibleType.COLLECTIBLE_MOMS_KNIFE) then
+    aEntityPlayer.Damage = aEntityPlayer.Damage * knifeDamageReduction
+  end
+  
+  if aCacheFlag == CacheFlag.CACHE_DAMAGE then
+    aEntityPlayer.Damage = aEntityPlayer.Damage + Character.myStealthDamageBonus
+  end
 end
 
 function hiding:UseHeadInABag(aFoo, aBar)
   if robesCostume ~= nil and transendCostume ~= nil and sackCostume ~= nil then
+    local game = Game()
+    local room = game:GetRoom()
+    local level = game:GetLevel()    
     local player = Isaac.GetPlayer(0)
     
     player:RemoveCostume(robesCostume)
@@ -287,6 +300,9 @@ function hiding:UseHeadInABag(aFoo, aBar)
     player:AddCostume(sackCostume, false)
     
     CurrentRoom.myIsHeadInABagActive = true
+    CurrentRoom.myHasIsaacBeenSeen = false
+    level:AddCurse(LevelCurse.CURSE_OF_DARKNESS, false)
+    OpenNormalDoors(room)
   end
 end
 
